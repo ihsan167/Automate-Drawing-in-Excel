@@ -2,6 +2,7 @@ from PIL import Image
 
 from pandas import DataFrame
 
+import os 
 
 from tkinter import filedialog
 
@@ -46,7 +47,9 @@ RGBColor = list(pixValue.keys())
 
 print  (RGBColor)
 
+current = os.getcwd()
+
 df = DataFrame(pixValue, columns = [RGBColor[0],RGBColor[1], RGBColor[2],RGBColor[3],RGBColor[4]])
 
-export_csv = df.to_csv(r'D:\phyton\pixelResult1.csv', index = True, header =True)
+export_csv = df.to_csv(current +  r'\pixelResult1.csv', index = True, header =True)
 
