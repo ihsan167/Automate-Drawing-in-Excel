@@ -1,57 +1,81 @@
 from PIL import Image
 import pandas as pd
-from pandas import DataFrame
-import os
 import xlwings as xw
-
 from tkinter import filedialog
 
-im = Image.open(filedialog.askopenfilename(title = 'Ihsan Kacak sangat ni', filetypes = [('JPG','*.jpg'),('JPG','*.png'),('JPG','*.PNG'),('JPEG','*.JPEG')]))
-
-rgbIm = im.convert('RGB')
+EXCEL_MAX_PIXELS = 1_048_576  # Excel row limit
 
 
-imageX,imageY = im.size
-print(imageX)
-print(imageY)
+def main():
+    # Prompt user to select an image file
+    image_path = filedialog.askopenfilename(
+        title='Select an image file',
+        filetypes=[('Image Files', '*.jpg *.jpeg *.png *.PNG *.JPEG')]
+    )
+    if not image_path:
+        print("No file selected. Exiting.")
+        return
 
-pix_val = list(rgbIm.getdata()) #this is tuple in list
+    # Open and convert image
+    print("Loading image...")
+    try:
+        im = Image.open(image_path)
+    except Exception as e:
+        print(f"Error opening image: {e}")
+        return
+
+    rgbIm = im.convert('RGB')
+    imageX, imageY = im.size
+    print(f"Image size: {imageX}x{imageY} pixels ({imageX * imageY} total pixels)")
+
+    if imageX * imageY > EXCEL_MAX_PIXELS:
+        print(
+            f"Error: Image has {imageX * imageY} pixels, which exceeds Excel's "
+            f"limit of {EXCEL_MAX_PIXELS} rows. Please use a smaller image."
+        )
+        return
+
+    # Extract RGB channel values from every pixel
+    pix_val = list(rgbIm.getdata())
+    Rvalue = [p[0] for p in pix_val]
+    Gvalue = [p[1] for p in pix_val]
+    Bvalue = [p[2] for p in pix_val]
+
+    df = pd.DataFrame({
+        'Red Value':   Rvalue,
+        'Green Value': Gvalue,
+        'Blue Value':  Bvalue,
+        'XWidth':      imageX,
+        'YHeight':     imageY,
+    })
+
+    # Write pixel data into the Excel workbook
+    print("Opening AutomateDraw.xlsm...")
+    try:
+        app = xw.App(visible=False)
+        wb = xw.Book('AutomateDraw.xlsm')
+    except Exception as e:
+        print(f"Error opening AutomateDraw.xlsm: {e}")
+        print("Make sure AutomateDraw.xlsm is in the same directory as this script.")
+        return
+
+    try:
+        ws = wb.sheets['pixelResult']
+    except Exception as e:
+        print(f"Error accessing sheet 'pixelResult': {e}")
+        wb.close()
+        app.quit()
+        return
+
+    print("Writing pixel data to Excel...")
+    ws.range('A:F').api.Delete()
+    ws.range('A1').options(index=True).value = df
+
+    wb.save()
+    wb.close()
+    app.quit()
+    print("Done! Open AutomateDraw.xlsm and run the macro to see your drawing.")
 
 
-pix_val_flat = [x for sets in pix_val for x in sets] #This is integer in list
-
-
-Rvalue = [R[0] for R in pix_val]
-Gvalue = [G[1] for G in pix_val]
-Bvalue = [B[2] for B in pix_val]
-
-
-#This part is to write the pixel value into csv
-pixValue = {'Red Value': Rvalue,'Green Value': Rvalue,'Blue Value' :Bvalue,'XWidth':imageX, 'YHeight':imageY}
-RGBColor = list(pixValue.keys())
-
-print  (RGBColor)
-
-df = DataFrame(pixValue, columns = [RGBColor[0],RGBColor[1], RGBColor[2],RGBColor[3],RGBColor[4]])
-#print (df.head())
-#current = os.getcwd()
-app = xw.App(visible = False)
-wb = xw.Book('AutomateDraw.xlsm')
-ws = wb.sheets['pixelResult']
-xw.Range('A:F').api.Delete()
-
-ws.range('A1').options(index = True).value = df
-
-for sheet in wb.sheets:
-    if 'Sheet1' in sheet.name:
-        sheet.delete()
-
-
-#Close workbook
-wb.save()
-wb.close()
-app.quit()
-
-
-#export_csv = df.to_csv(current + r'\pixelResult1.csv', index = True, header =True)
-
+if __name__ == '__main__':
+    main()
